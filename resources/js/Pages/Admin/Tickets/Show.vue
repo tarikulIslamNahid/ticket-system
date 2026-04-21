@@ -20,6 +20,8 @@ import {
     Send,
     CheckCircle2,
     Radio,
+    Lock,
+    Unlock,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -32,11 +34,14 @@ const flashSuccess = computed(() => page.props.flash?.success);
 const data = computed(() => props.ticket.data ?? props.ticket);
 
 const replies = ref([...(data.value.replies ?? [])]);
+const currentStatus = ref(data.value.status);
+const closedAt = ref(data.value.closed_at);
 const customerTyping = ref(false);
 let typingTimer = null;
 let channel = null;
 
-const statusVariant = computed(() => (data.value.status === 'closed' ? 'secondary' : 'default'));
+const isClosed = computed(() => currentStatus.value === 'closed');
+const statusVariant = computed(() => (isClosed.value ? 'secondary' : 'default'));
 
 const categoryLabel = computed(() => {
     const map = { support: 'Support', billing: 'Billing', other: 'Other' };
@@ -54,6 +59,15 @@ const submit = () => {
     form.post(route('admin.tickets.reply', data.value.id), {
         preserveScroll: true,
         onSuccess: () => form.reset('message'),
+    });
+};
+
+const statusForm = useForm({ status: '' });
+
+const toggleStatus = () => {
+    statusForm.status = isClosed.value ? 'open' : 'closed';
+    statusForm.patch(route('admin.tickets.status', data.value.id), {
+        preserveScroll: true,
     });
 };
 
@@ -98,6 +112,13 @@ onMounted(() => {
             typingTimer = setTimeout(() => {
                 customerTyping.value = false;
             }, 2500);
+        }
+    });
+
+    channel.listen('.status.changed', (event) => {
+        if (event?.status) {
+            currentStatus.value = event.status;
+            closedAt.value = event.closed_at;
         }
     });
 });
@@ -151,7 +172,7 @@ const initials = (name) => {
                             {{ data.ticket_number }}
                         </span>
                         <Badge :variant="statusVariant" class="capitalize">
-                            {{ data.status }}
+                            {{ currentStatus }}
                         </Badge>
                         <span
                             class="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground"
@@ -287,7 +308,7 @@ const initials = (name) => {
                             </CardDescription>
                         </div>
                         <Button
-                            v-if="data.ai_suggested_reply"
+                            v-if="data.ai_suggested_reply && !isClosed"
                             type="button"
                             variant="outline"
                             size="sm"
@@ -298,7 +319,14 @@ const initials = (name) => {
                         </Button>
                     </CardHeader>
                     <CardContent>
-                        <form class="space-y-3" @submit.prevent="submit">
+                        <div
+                            v-if="isClosed"
+                            class="rounded-md border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground"
+                        >
+                            This ticket is closed. Reopen it from the Details panel
+                            to send a reply.
+                        </div>
+                        <form v-else class="space-y-3" @submit.prevent="submit">
                             <Textarea
                                 v-model="form.message"
                                 rows="5"
@@ -349,11 +377,24 @@ const initials = (name) => {
                             </p>
                             <p class="mt-1">{{ formatDate(data.created_at) }}</p>
                         </div>
-                        <div v-if="data.closed_at">
+                        <div v-if="closedAt">
                             <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                 Closed
                             </p>
-                            <p class="mt-1">{{ formatDate(data.closed_at) }}</p>
+                            <p class="mt-1">{{ formatDate(closedAt) }}</p>
+                        </div>
+                        <div class="pt-2">
+                            <Button
+                                type="button"
+                                :variant="isClosed ? 'outline' : 'destructive'"
+                                class="w-full"
+                                :disabled="statusForm.processing"
+                                @click="toggleStatus"
+                            >
+                                <Unlock v-if="isClosed" class="mr-1 h-4 w-4" />
+                                <Lock v-else class="mr-1 h-4 w-4" />
+                                {{ isClosed ? 'Reopen ticket' : 'Close ticket' }}
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>

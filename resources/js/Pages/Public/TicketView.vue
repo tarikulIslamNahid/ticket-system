@@ -34,13 +34,14 @@ const flashSuccess = computed(() => page.props.flash?.success);
 const data = computed(() => props.ticket.data ?? props.ticket);
 
 const replies = ref([...(data.value.replies ?? [])]);
+const currentStatus = ref(data.value.status);
 const adminTyping = ref(false);
 let typingTimer = null;
 let channel = null;
 
-const statusLabel = computed(() => (data.value.status === 'closed' ? 'Closed' : 'Open'));
-const statusVariant = computed(() => (data.value.status === 'closed' ? 'secondary' : 'default'));
-const isClosed = computed(() => data.value.status === 'closed');
+const statusLabel = computed(() => (currentStatus.value === 'closed' ? 'Closed' : 'Open'));
+const statusVariant = computed(() => (currentStatus.value === 'closed' ? 'secondary' : 'default'));
+const isClosed = computed(() => currentStatus.value === 'closed');
 
 const categoryLabel = computed(() => {
     const map = { support: 'Support', billing: 'Billing', other: 'Other' };
@@ -110,6 +111,12 @@ onMounted(() => {
             typingTimer = setTimeout(() => {
                 adminTyping.value = false;
             }, 2500);
+        }
+    });
+
+    channel.listen('.status.changed', (event) => {
+        if (event?.status) {
+            currentStatus.value = event.status;
         }
     });
 });
