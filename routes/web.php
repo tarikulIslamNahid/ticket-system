@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/tickets/{ticket}', [AdminTicketController::class, 'show'])->name('tickets.show');
         Route::post('/tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('tickets.reply');
         Route::post('/tickets/{ticket}/typing', [AdminTicketController::class, 'typing'])->name('tickets.typing');
+        Route::patch('/tickets/{ticket}/status', [AdminTicketController::class, 'updateStatus'])->name('tickets.status');
     });
 });
 

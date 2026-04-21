@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Events\TicketTypingBroadcast;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ReplyTicketRequest;
+use App\Http\Requests\UpdateTicketStatusRequest;
 use App\Http\Resources\TicketResource;
 use App\Models\Ticket;
 use App\Services\TicketService;
@@ -60,6 +61,12 @@ class TicketController extends Controller
 
     public function reply(ReplyTicketRequest $request, Ticket $ticket): RedirectResponse
     {
+        if ($ticket->status === Ticket::STATUS_CLOSED) {
+            return back()->withErrors([
+                'message' => 'This ticket is closed. Reopen it before replying.',
+            ]);
+        }
+
         $this->ticketService->replyAsAdmin(
             $ticket,
             $request->user(),
@@ -76,5 +83,18 @@ class TicketController extends Controller
         TicketTypingBroadcast::dispatch($ticket->public_token, 'admin');
 
         return response()->json(['ok' => true]);
+    }
+
+    public function updateStatus(UpdateTicketStatusRequest $request, Ticket $ticket): RedirectResponse
+    {
+        $status = $request->validated('status');
+
+        $this->ticketService->changeStatus($ticket, $status);
+
+        return redirect()
+            ->route('admin.tickets.show', $ticket)
+            ->with('success', $status === Ticket::STATUS_CLOSED
+                ? 'Ticket closed.'
+                : 'Ticket reopened.');
     }
 }

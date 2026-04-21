@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Events\TicketReplyBroadcast;
+use App\Events\TicketStatusBroadcast;
 use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Models\User;
@@ -119,7 +120,15 @@ class TicketService
             'closed_at' => $status === Ticket::STATUS_CLOSED ? Carbon::now() : null,
         ]);
 
-        return $ticket->refresh();
+        $ticket = $ticket->refresh();
+
+        TicketStatusBroadcast::dispatch(
+            $ticket->public_token,
+            $ticket->status,
+            $ticket->closed_at?->toISOString(),
+        );
+
+        return $ticket;
     }
 
     private function generateTicketNumber(): string

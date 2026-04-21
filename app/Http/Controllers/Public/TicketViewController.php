@@ -40,6 +40,12 @@ class TicketViewController extends Controller
     {
         $ticket = $this->findTicketByToken($token);
 
+        if ($ticket->status === Ticket::STATUS_CLOSED) {
+            return back()->withErrors([
+                'message' => 'This ticket is closed. Please submit a new ticket if you need further help.',
+            ]);
+        }
+
         $this->ticketService->replyAsCustomer(
             $ticket,
             $request->validated('message'),
