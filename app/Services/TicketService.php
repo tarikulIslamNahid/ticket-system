@@ -6,13 +6,18 @@ namespace App\Services;
 
 use App\Events\TicketReplyBroadcast;
 use App\Events\TicketStatusBroadcast;
+use App\Mail\TicketCreatedMail;
+use App\Mail\TicketReplyMail;
 use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Throwable;
 
 class TicketService
 {
@@ -29,8 +34,8 @@ class TicketService
     {
         $analysis = $this->ai->analyze($data['message'], $data['subject'] ?? null);
 
-        return DB::transaction(function () use ($data, $source, $analysis): Ticket {
-            $ticket = Ticket::create([
+        $ticket = DB::transaction(function () use ($data, $source, $analysis): Ticket {
+            return Ticket::create([
                 'ticket_number' => $this->generateTicketNumber(),
                 'public_token' => $this->generatePublicToken(),
                 'source' => $source,
@@ -43,9 +48,11 @@ class TicketService
                 'status' => Ticket::STATUS_OPEN,
                 'ai_suggested_reply' => $analysis['suggested_reply'],
             ]);
-
-            return $ticket;
         });
+
+        $this->sendCreatedNotification($ticket);
+
+        return $ticket;
     }
 
     /**
@@ -63,6 +70,8 @@ class TicketService
         $reply->setRelation('user', $admin);
 
         TicketReplyBroadcast::dispatch($reply, $ticket->public_token, $ticket->name);
+
+        $this->sendReplyNotification($ticket, $reply);
 
         return $reply;
     }
@@ -129,6 +138,53 @@ class TicketService
         );
 
         return $ticket;
+    }
+
+    /**
+     * Send the "ticket received" email to the customer.
+     * Failures are logged but never bubble up so ticket creation is resilient.
+     */
+    private function sendCreatedNotification(Ticket $ticket): void
+    {
+        if (! $ticket->email) {
+            return;
+        }
+
+        try {
+            Mail::to($ticket->email)->send(new TicketCreatedMail($ticket));
+
+            $ticket->forceFill(['notification_email_sent_at' => Carbon::now()])->save();
+        } catch (Throwable $e) {
+            Log::warning('Failed to send ticket-created email', [
+                'ticket_id' => $ticket->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Send the admin-replied email to the customer.
+     */
+    private function sendReplyNotification(Ticket $ticket, TicketReply $reply): void
+    {
+        if (! $ticket->email) {
+            return;
+        }
+
+        try {
+            Mail::to($ticket->email)->send(new TicketReplyMail($ticket, $reply));
+
+            $reply->forceFill([
+                'email_sent' => true,
+                'email_sent_at' => Carbon::now(),
+            ])->save();
+        } catch (Throwable $e) {
+            Log::warning('Failed to send ticket-reply email', [
+                'ticket_id' => $ticket->id,
+                'reply_id' => $reply->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function generateTicketNumber(): string
