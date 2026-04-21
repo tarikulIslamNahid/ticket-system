@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ReplyTicketRequest;
 use App\Http\Resources\TicketResource;
 use App\Models\Ticket;
 use App\Services\TicketService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,5 +41,31 @@ class TicketController extends Controller
                 ['value' => Ticket::STATUS_CLOSED, 'label' => 'Closed'],
             ],
         ]);
+    }
+
+    public function show(Ticket $ticket): Response
+    {
+        $ticket->load([
+            'replies' => function ($query) {
+                $query->orderBy('created_at')->with('user:id,name');
+            },
+        ]);
+
+        return Inertia::render('Admin/Tickets/Show', [
+            'ticket' => new TicketResource($ticket),
+        ]);
+    }
+
+    public function reply(ReplyTicketRequest $request, Ticket $ticket): RedirectResponse
+    {
+        $this->ticketService->replyAsAdmin(
+            $ticket,
+            $request->user(),
+            $request->validated('message'),
+        );
+
+        return redirect()
+            ->route('admin.tickets.show', $ticket)
+            ->with('success', 'Reply sent to customer.');
     }
 }

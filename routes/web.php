@@ -26,6 +26,8 @@ Route::middleware('auth')->group(function (): void {
 
     Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/tickets', [AdminTicketController::class, 'index'])->name('tickets.index');
+        Route::get('/tickets/{ticket}', [AdminTicketController::class, 'show'])->name('tickets.show');
+        Route::post('/tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('tickets.reply');
     });
 });
 
