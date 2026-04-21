@@ -47,9 +47,8 @@ const navItems = [
     {
         label: 'Tickets',
         icon: Ticket,
-        route: 'tickets.index',
-        href: '/tickets',
-        disabled: true,
+        route: 'admin.tickets.index',
+        href: '/admin/tickets',
     },
     {
         label: 'Settings',
