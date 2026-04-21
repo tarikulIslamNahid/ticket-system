@@ -32,6 +32,7 @@ class TicketResource extends JsonResource
             'closed_at' => $this->closed_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'replies_count' => $this->when(isset($this->replies_count), $this->replies_count),
             'replies' => TicketReplyResource::collection($this->whenLoaded('replies')),
         ];
     }

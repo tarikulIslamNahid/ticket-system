@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -69,6 +70,35 @@ class TicketService
             'sender_type' => TicketReply::SENDER_CUSTOMER,
             'message' => $message,
         ]);
+    }
+
+    /**
+     * Paginated list of tickets for the admin panel with optional filters.
+     *
+     * @param  array{status?: ?string, search?: ?string}  $filters
+     * @return LengthAwarePaginator<Ticket>
+     */
+    public function listTickets(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    {
+        return Ticket::query()
+            ->when(
+                ! empty($filters['status']),
+                fn ($query) => $query->where('status', $filters['status'])
+            )
+            ->when(
+                ! empty($filters['search']),
+                fn ($query) => $query->where(function ($q) use ($filters): void {
+                    $term = '%'.$filters['search'].'%';
+                    $q->where('ticket_number', 'like', $term)
+                        ->orWhere('name', 'like', $term)
+                        ->orWhere('email', 'like', $term)
+                        ->orWhere('subject', 'like', $term);
+                })
+            )
+            ->withCount('replies')
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     public function changeStatus(Ticket $ticket, string $status): Ticket
