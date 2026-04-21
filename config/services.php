@@ -42,8 +42,4 @@ return [
         'timeout' => (int) env('GEMINI_TIMEOUT', 10),
     ],
 
-    'sendgrid' => [
-        'inbound_secret' => env('SENDGRID_INBOUND_SECRET'),
-    ],
-
 ];

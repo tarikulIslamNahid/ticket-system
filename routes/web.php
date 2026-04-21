@@ -6,7 +6,6 @@ use App\Http\Controllers\Admin\TicketController as AdminTicketController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Public\ContactController;
 use App\Http\Controllers\Public\TicketViewController;
-use App\Http\Controllers\Webhooks\SendGridInboundController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -24,11 +23,6 @@ Route::prefix('ticket/{token}')
         Route::post('/reply', [TicketViewController::class, 'reply'])->name('ticket.reply');
         Route::post('/typing', [TicketViewController::class, 'typing'])->name('ticket.typing');
     });
-
-Route::post('webhooks/sendgrid/inbound/{secret}', [SendGridInboundController::class, 'handle'])
-    ->middleware('throttle:60,1')
-    ->where('secret', '[A-Za-z0-9\-_]+')
-    ->name('webhooks.sendgrid.inbound');
 
 Route::prefix('chat')->name('chat.')->group(function (): void {
     Route::post('/start', [ChatController::class, 'start'])->name('start');
