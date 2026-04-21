@@ -4,19 +4,17 @@ import { Link } from '@inertiajs/vue3';
 </script>
 
 <template>
-    <div
-        class="flex min-h-screen flex-col items-center bg-gray-100 pt-6 sm:justify-center sm:pt-0"
-    >
-        <div>
-            <Link href="/">
-                <ApplicationLogo class="h-20 w-20 fill-current text-gray-500" />
+    <div class="flex min-h-screen flex-col items-center justify-center bg-muted/50 p-4 sm:p-6">
+        <div class="mb-6 flex flex-col items-center gap-2 text-center">
+            <Link href="/" class="flex items-center gap-2 font-semibold">
+                <ApplicationLogo class="h-10 w-10 fill-current text-primary" />
+                <span class="text-xl">Ticket System</span>
             </Link>
+            <p class="text-sm text-muted-foreground">
+                Admin portal for managing customer tickets
+            </p>
         </div>
 
-        <div
-            class="mt-6 w-full overflow-hidden bg-white px-6 py-4 shadow-md sm:max-w-md sm:rounded-lg"
-        >
-            <slot />
-        </div>
+        <slot />
     </div>
 </template>
