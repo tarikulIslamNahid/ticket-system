@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Button } from '@/Components/ui/button';
@@ -19,6 +19,7 @@ import {
     Sparkles,
     Send,
     CheckCircle2,
+    Radio,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -29,6 +30,11 @@ const page = usePage();
 const flashSuccess = computed(() => page.props.flash?.success);
 
 const data = computed(() => props.ticket.data ?? props.ticket);
+
+const replies = ref([...(data.value.replies ?? [])]);
+const customerTyping = ref(false);
+let typingTimer = null;
+let channel = null;
 
 const statusVariant = computed(() => (data.value.status === 'closed' ? 'secondary' : 'default'));
 
@@ -56,6 +62,53 @@ const useAiSuggestion = () => {
         form.message = data.value.ai_suggested_reply;
     }
 };
+
+// Debounced typing notification to backend
+let typingNotifyTimer = null;
+const notifyTyping = () => {
+    clearTimeout(typingNotifyTimer);
+    typingNotifyTimer = setTimeout(() => {
+        window.axios
+            .post(route('admin.tickets.typing', data.value.id))
+            .catch(() => {});
+    }, 400);
+};
+
+watch(() => form.message, (value) => {
+    if (value && value.length > 0) notifyTyping();
+});
+
+onMounted(() => {
+    if (! window.Echo) return;
+
+    channel = window.Echo.channel(`ticket.${data.value.public_token}`);
+
+    channel.listen('.reply.created', (event) => {
+        if (! event?.reply) return;
+        // Dedupe by id
+        if (! replies.value.some((r) => r.id === event.reply.id)) {
+            replies.value.push(event.reply);
+        }
+    });
+
+    channel.listen('.typing', (event) => {
+        if (event?.who === 'customer') {
+            customerTyping.value = true;
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                customerTyping.value = false;
+            }, 2500);
+        }
+    });
+});
+
+onBeforeUnmount(() => {
+    clearTimeout(typingTimer);
+    clearTimeout(typingNotifyTimer);
+    if (channel && window.Echo) {
+        window.Echo.leave(`ticket.${data.value.public_token}`);
+    }
+});
 
 const formatDate = (iso) => {
     if (!iso) return '';
@@ -100,6 +153,13 @@ const initials = (name) => {
                         <Badge :variant="statusVariant" class="capitalize">
                             {{ data.status }}
                         </Badge>
+                        <span
+                            class="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground"
+                            title="Live updates enabled"
+                        >
+                            <Radio class="h-3.5 w-3.5 text-green-500" />
+                            Live
+                        </span>
                     </div>
                     <h2 class="mt-1 text-xl font-semibold tracking-tight">
                         {{ data.subject || 'Support request' }}
@@ -109,7 +169,6 @@ const initials = (name) => {
         </template>
 
         <div class="grid gap-6 p-4 sm:p-6 lg:grid-cols-[1fr_320px] lg:p-8">
-            <!-- Main column: conversation + reply -->
             <div class="space-y-6">
                 <div
                     v-if="flashSuccess"
@@ -119,16 +178,14 @@ const initials = (name) => {
                     {{ flashSuccess }}
                 </div>
 
-                <!-- Conversation thread -->
                 <Card>
                     <CardHeader>
                         <CardTitle class="text-base">Conversation</CardTitle>
                         <CardDescription>
-                            Original message and all replies, oldest first.
+                            Original message and all replies. New replies appear in real time.
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-4">
-                        <!-- Original message -->
                         <div class="flex gap-3">
                             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
                                 {{ initials(data.name) }}
@@ -151,10 +208,9 @@ const initials = (name) => {
                             </div>
                         </div>
 
-                        <!-- Replies -->
-                        <template v-if="data.replies && data.replies.length">
+                        <template v-if="replies.length">
                             <div
-                                v-for="reply in data.replies"
+                                v-for="reply in replies"
                                 :key="reply.id"
                                 class="flex gap-3"
                                 :class="{ 'flex-row-reverse': reply.sender_type === 'admin' }"
@@ -199,16 +255,35 @@ const initials = (name) => {
                         >
                             No replies yet. Be the first to respond.
                         </div>
+
+                        <!-- Customer typing indicator -->
+                        <div
+                            v-if="customerTyping"
+                            class="flex gap-3"
+                        >
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                                {{ initials(data.name) }}
+                            </div>
+                            <div class="flex-1 rounded-lg border bg-background p-4">
+                                <div class="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <span>{{ data.name }} is typing</span>
+                                    <span class="flex gap-0.5">
+                                        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style="animation-delay: 0ms"></span>
+                                        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style="animation-delay: 150ms"></span>
+                                        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style="animation-delay: 300ms"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
-                <!-- Reply form -->
                 <Card>
                     <CardHeader class="flex flex-row items-start justify-between space-y-0">
                         <div>
                             <CardTitle class="text-base">Reply</CardTitle>
                             <CardDescription>
-                                The customer will be notified by email.
+                                The customer will see this update instantly.
                             </CardDescription>
                         </div>
                         <Button
@@ -246,7 +321,6 @@ const initials = (name) => {
                 </Card>
             </div>
 
-            <!-- Sidebar: ticket metadata -->
             <aside class="space-y-4">
                 <Card>
                     <CardHeader>

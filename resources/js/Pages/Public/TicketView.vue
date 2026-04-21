@@ -1,9 +1,8 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Badge } from '@/Components/ui/badge';
-import { Button } from '@/Components/ui/button';
 import {
     Card,
     CardContent,
@@ -11,7 +10,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/Components/ui/card';
-import { CheckCircle2, Mail, Phone, ArrowLeft } from 'lucide-vue-next';
+import { CheckCircle2, Mail, Phone, ArrowLeft, Radio } from 'lucide-vue-next';
 
 const props = defineProps({
     ticket: {
@@ -24,6 +23,11 @@ const page = usePage();
 const flashSuccess = computed(() => page.props.flash?.success);
 
 const data = computed(() => props.ticket.data ?? props.ticket);
+
+const replies = ref([...(data.value.replies ?? [])]);
+const adminTyping = ref(false);
+let typingTimer = null;
+let channel = null;
 
 const statusLabel = computed(() => (data.value.status === 'closed' ? 'Closed' : 'Open'));
 const statusVariant = computed(() => (data.value.status === 'closed' ? 'secondary' : 'default'));
@@ -44,6 +48,44 @@ const formatDate = (iso) => {
         minute: '2-digit',
     });
 };
+
+const initials = (name) => (name || '?')
+    .split(' ')
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+onMounted(() => {
+    if (! window.Echo) return;
+
+    channel = window.Echo.channel(`ticket.${data.value.public_token}`);
+
+    channel.listen('.reply.created', (event) => {
+        if (! event?.reply) return;
+        if (! replies.value.some((r) => r.id === event.reply.id)) {
+            replies.value.push(event.reply);
+        }
+    });
+
+    channel.listen('.typing', (event) => {
+        if (event?.who === 'admin') {
+            adminTyping.value = true;
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                adminTyping.value = false;
+            }, 2500);
+        }
+    });
+});
+
+onBeforeUnmount(() => {
+    clearTimeout(typingTimer);
+    if (channel && window.Echo) {
+        window.Echo.leave(`ticket.${data.value.public_token}`);
+    }
+});
 </script>
 
 <template>
@@ -51,13 +93,22 @@ const formatDate = (iso) => {
 
     <PublicLayout>
         <div class="mx-auto max-w-3xl space-y-6">
-            <Link
-                :href="route('contact.create')"
-                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-                <ArrowLeft class="h-4 w-4" />
-                Submit another ticket
-            </Link>
+            <div class="flex items-center justify-between">
+                <Link
+                    :href="route('contact.create')"
+                    class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                >
+                    <ArrowLeft class="h-4 w-4" />
+                    Submit another ticket
+                </Link>
+                <span
+                    class="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                    title="Live updates enabled"
+                >
+                    <Radio class="h-3.5 w-3.5 text-green-500" />
+                    Live
+                </span>
+            </div>
 
             <div
                 v-if="flashSuccess"
@@ -67,7 +118,7 @@ const formatDate = (iso) => {
                 <div>
                     <p class="font-medium">{{ flashSuccess }}</p>
                     <p class="mt-1 text-green-700/80">
-                        Save this page link — you can return to check for replies any time.
+                        Keep this page open — admin replies will appear here in real time.
                     </p>
                 </div>
             </div>
@@ -98,7 +149,6 @@ const formatDate = (iso) => {
                 </CardHeader>
 
                 <CardContent class="space-y-6">
-                    <!-- Contact info -->
                     <div class="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-[auto_1fr]">
                         <span class="font-medium text-muted-foreground">From</span>
                         <span>{{ data.name }}</span>
@@ -114,12 +164,11 @@ const formatDate = (iso) => {
                         <span v-if="data.phone">{{ data.phone }}</span>
                     </div>
 
-                    <!-- Conversation thread -->
                     <div class="space-y-4">
                         <!-- Original message -->
                         <div class="flex gap-3">
                             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold uppercase text-primary">
-                                {{ (data.name || '?').slice(0, 2) }}
+                                {{ initials(data.name) }}
                             </div>
                             <div class="flex-1 rounded-lg border bg-background p-4">
                                 <div class="flex items-center justify-between gap-2">
@@ -134,10 +183,10 @@ const formatDate = (iso) => {
                             </div>
                         </div>
 
-                        <!-- Replies -->
-                        <template v-if="data.replies && data.replies.length">
+                        <!-- Replies (live-updated) -->
+                        <template v-if="replies.length">
                             <div
-                                v-for="reply in data.replies"
+                                v-for="reply in replies"
                                 :key="reply.id"
                                 class="flex gap-3"
                                 :class="{ 'flex-row-reverse': reply.sender_type === 'admin' }"
@@ -148,7 +197,7 @@ const formatDate = (iso) => {
                                         ? 'bg-primary text-primary-foreground'
                                         : 'bg-muted text-muted-foreground'"
                                 >
-                                    {{ (reply.author_name || '?').slice(0, 2).toUpperCase() }}
+                                    {{ initials(reply.author_name) }}
                                 </div>
                                 <div
                                     class="flex-1 rounded-lg p-4"
@@ -178,10 +227,27 @@ const formatDate = (iso) => {
                         </template>
 
                         <div
-                            v-if="!data.replies || data.replies.length === 0"
+                            v-if="!replies.length && !adminTyping"
                             class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground"
                         >
-                            Waiting for a reply from our team. You'll receive an email once someone responds.
+                            Waiting for a reply from our team. Updates appear here automatically.
+                        </div>
+
+                        <!-- Admin typing indicator -->
+                        <div v-if="adminTyping" class="flex flex-row-reverse gap-3">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                                S
+                            </div>
+                            <div class="flex-1 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                                <div class="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <span>Support is typing</span>
+                                    <span class="flex gap-0.5">
+                                        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" style="animation-delay: 0ms"></span>
+                                        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" style="animation-delay: 150ms"></span>
+                                        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" style="animation-delay: 300ms"></span>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
