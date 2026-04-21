@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\TicketController as AdminTicketController;
+use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Public\ContactController;
 use App\Http\Controllers\Public\TicketViewController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,18 @@ Route::prefix('ticket/{token}')
         Route::post('/reply', [TicketViewController::class, 'reply'])->name('ticket.reply');
         Route::post('/typing', [TicketViewController::class, 'typing'])->name('ticket.typing');
     });
+
+Route::prefix('chat')->name('chat.')->group(function (): void {
+    Route::post('/start', [ChatController::class, 'start'])->name('start');
+
+    Route::prefix('{token}')
+        ->where(['token' => '[A-Za-z0-9]+'])
+        ->group(function (): void {
+            Route::get('/', [ChatController::class, 'show'])->name('show');
+            Route::post('/reply', [ChatController::class, 'reply'])->name('reply');
+            Route::post('/typing', [ChatController::class, 'typing'])->name('typing');
+        });
+});
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', function () {
