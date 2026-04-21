@@ -15,9 +15,13 @@ Route::get('/', function () {
 Route::get('/contact', [ContactController::class, 'create'])->name('contact.create');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
 
-Route::get('/ticket/{token}', [TicketViewController::class, 'show'])
-    ->where('token', '[A-Za-z0-9]+')
-    ->name('ticket.view');
+Route::prefix('ticket/{token}')
+    ->where(['token' => '[A-Za-z0-9]+'])
+    ->group(function (): void {
+        Route::get('/', [TicketViewController::class, 'show'])->name('ticket.view');
+        Route::post('/reply', [TicketViewController::class, 'reply'])->name('ticket.reply');
+        Route::post('/typing', [TicketViewController::class, 'typing'])->name('ticket.typing');
+    });
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', function () {
