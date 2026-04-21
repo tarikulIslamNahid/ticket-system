@@ -122,7 +122,8 @@ const formatDate = (iso) => {
                         <TableRow
                             v-for="ticket in tickets.data"
                             :key="ticket.id"
-                            class="cursor-pointer"
+                            class="cursor-pointer transition-colors hover:bg-muted/50"
+                            @click="router.get(route('admin.tickets.show', ticket.id))"
                         >
                             <TableCell class="font-mono text-xs font-medium">
                                 {{ ticket.ticket_number }}
