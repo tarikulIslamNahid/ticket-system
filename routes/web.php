@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\TicketController as AdminTicketController;
 use App\Http\Controllers\Public\ContactController;
 use App\Http\Controllers\Public\TicketViewController;
 use Illuminate\Support\Facades\Route;
@@ -18,8 +19,14 @@ Route::get('/ticket/{token}', [TicketViewController::class, 'show'])
     ->where('token', '[A-Za-z0-9]+')
     ->name('ticket.view');
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth'])->name('dashboard');
+Route::middleware('auth')->group(function (): void {
+    Route::get('/dashboard', function () {
+        return Inertia::render('Dashboard');
+    })->name('dashboard');
+
+    Route::prefix('admin')->name('admin.')->group(function (): void {
+        Route::get('/tickets', [AdminTicketController::class, 'index'])->name('tickets.index');
+    });
+});
 
 require __DIR__.'/auth.php';
