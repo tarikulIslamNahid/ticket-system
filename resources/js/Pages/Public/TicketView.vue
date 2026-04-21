@@ -1,8 +1,10 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Badge } from '@/Components/ui/badge';
+import { Button } from '@/Components/ui/button';
+import { Textarea } from '@/Components/ui/textarea';
 import {
     Card,
     CardContent,
@@ -10,7 +12,14 @@ import {
     CardHeader,
     CardTitle,
 } from '@/Components/ui/card';
-import { CheckCircle2, Mail, Phone, ArrowLeft, Radio } from 'lucide-vue-next';
+import {
+    CheckCircle2,
+    Mail,
+    Phone,
+    ArrowLeft,
+    Radio,
+    Send,
+} from 'lucide-vue-next';
 
 const props = defineProps({
     ticket: {
@@ -31,10 +40,35 @@ let channel = null;
 
 const statusLabel = computed(() => (data.value.status === 'closed' ? 'Closed' : 'Open'));
 const statusVariant = computed(() => (data.value.status === 'closed' ? 'secondary' : 'default'));
+const isClosed = computed(() => data.value.status === 'closed');
 
 const categoryLabel = computed(() => {
     const map = { support: 'Support', billing: 'Billing', other: 'Other' };
     return map[data.value.category] ?? 'Other';
+});
+
+const form = useForm({ message: '' });
+
+const submit = () => {
+    form.post(route('ticket.reply', data.value.public_token), {
+        preserveScroll: true,
+        onSuccess: () => form.reset('message'),
+    });
+};
+
+// Debounced typing notification to backend
+let typingNotifyTimer = null;
+const notifyTyping = () => {
+    clearTimeout(typingNotifyTimer);
+    typingNotifyTimer = setTimeout(() => {
+        window.axios
+            .post(route('ticket.typing', data.value.public_token))
+            .catch(() => {});
+    }, 400);
+};
+
+watch(() => form.message, (value) => {
+    if (value && value.length > 0) notifyTyping();
 });
 
 const formatDate = (iso) => {
@@ -82,6 +116,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     clearTimeout(typingTimer);
+    clearTimeout(typingNotifyTimer);
     if (channel && window.Echo) {
         window.Echo.leave(`ticket.${data.value.public_token}`);
     }
@@ -117,9 +152,6 @@ onBeforeUnmount(() => {
                 <CheckCircle2 class="mt-0.5 h-5 w-5 flex-shrink-0 text-green-600" />
                 <div>
                     <p class="font-medium">{{ flashSuccess }}</p>
-                    <p class="mt-1 text-green-700/80">
-                        Keep this page open — admin replies will appear here in real time.
-                    </p>
                 </div>
             </div>
 
@@ -249,6 +281,44 @@ onBeforeUnmount(() => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Customer reply form -->
+                    <div class="border-t pt-6">
+                        <div
+                            v-if="isClosed"
+                            class="rounded-md border border-dashed bg-muted/30 p-4 text-center text-sm text-muted-foreground"
+                        >
+                            This ticket is closed. Submit a new ticket if you need further help.
+                        </div>
+                        <form v-else class="space-y-3" @submit.prevent="submit">
+                            <div>
+                                <label for="customer-reply" class="text-sm font-medium">
+                                    Add a reply
+                                </label>
+                                <p class="text-xs text-muted-foreground">
+                                    Our team is notified in real time.
+                                </p>
+                            </div>
+                            <Textarea
+                                id="customer-reply"
+                                v-model="form.message"
+                                rows="4"
+                                placeholder="Type your reply…"
+                                required
+                                :class="{ 'border-destructive focus-visible:ring-destructive': form.errors.message }"
+                            />
+                            <p v-if="form.errors.message" class="text-sm text-destructive">
+                                {{ form.errors.message }}
+                            </p>
+                            <div class="flex justify-end">
+                                <Button type="submit" :disabled="form.processing || !form.message.trim()">
+                                    <Send class="mr-1 h-4 w-4" />
+                                    <span v-if="form.processing">Sending…</span>
+                                    <span v-else>Send reply</span>
+                                </Button>
+                            </div>
+                        </form>
                     </div>
                 </CardContent>
             </Card>
