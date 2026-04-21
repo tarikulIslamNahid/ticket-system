@@ -141,8 +141,13 @@ class TicketService
     }
 
     /**
-     * Send the "ticket received" email to the customer.
-     * Failures are logged but never bubble up so ticket creation is resilient.
+     * Queue the "ticket received" email for the customer.
+     *
+     * The Mailable implements ShouldQueue, so this returns immediately after
+     * dispatching the job. notification_email_sent_at records when we queued
+     * the mail — actual delivery happens on the queue worker.
+     * Queue-dispatch failures are logged; SMTP-level failures during worker
+     * execution land in the failed_jobs table with Laravel's auto-retry.
      */
     private function sendCreatedNotification(Ticket $ticket): void
     {
@@ -155,7 +160,7 @@ class TicketService
 
             $ticket->forceFill(['notification_email_sent_at' => Carbon::now()])->save();
         } catch (Throwable $e) {
-            Log::warning('Failed to send ticket-created email', [
+            Log::warning('Failed to queue ticket-created email', [
                 'ticket_id' => $ticket->id,
                 'error' => $e->getMessage(),
             ]);
@@ -163,7 +168,7 @@ class TicketService
     }
 
     /**
-     * Send the admin-replied email to the customer.
+     * Queue the admin-replied email for the customer.
      */
     private function sendReplyNotification(Ticket $ticket, TicketReply $reply): void
     {
@@ -179,7 +184,7 @@ class TicketService
                 'email_sent_at' => Carbon::now(),
             ])->save();
         } catch (Throwable $e) {
-            Log::warning('Failed to send ticket-reply email', [
+            Log::warning('Failed to queue ticket-reply email', [
                 'ticket_id' => $ticket->id,
                 'reply_id' => $reply->id,
                 'error' => $e->getMessage(),
