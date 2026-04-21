@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\TicketTypingBroadcast;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ReplyTicketRequest;
 use App\Http\Resources\TicketResource;
 use App\Models\Ticket;
 use App\Services\TicketService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -67,5 +69,12 @@ class TicketController extends Controller
         return redirect()
             ->route('admin.tickets.show', $ticket)
             ->with('success', 'Reply sent to customer.');
+    }
+
+    public function typing(Ticket $ticket): JsonResponse
+    {
+        TicketTypingBroadcast::dispatch($ticket->public_token, 'admin');
+
+        return response()->json(['ok' => true]);
     }
 }

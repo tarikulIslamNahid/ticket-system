@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Events\TicketReplyBroadcast;
 use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Models\User;
@@ -47,29 +48,39 @@ class TicketService
     }
 
     /**
-     * Record an admin reply to a ticket.
+     * Record an admin reply to a ticket and broadcast it to the ticket channel.
      */
     public function replyAsAdmin(Ticket $ticket, User $admin, string $message): TicketReply
     {
-        return TicketReply::create([
+        $reply = TicketReply::create([
             'ticket_id' => $ticket->id,
             'user_id' => $admin->id,
             'sender_type' => TicketReply::SENDER_ADMIN,
             'message' => $message,
         ]);
+
+        $reply->setRelation('user', $admin);
+
+        TicketReplyBroadcast::dispatch($reply, $ticket->public_token, $ticket->name);
+
+        return $reply;
     }
 
     /**
-     * Record a customer reply via the public ticket page.
+     * Record a customer reply via the public ticket page and broadcast it.
      */
     public function replyAsCustomer(Ticket $ticket, string $message): TicketReply
     {
-        return TicketReply::create([
+        $reply = TicketReply::create([
             'ticket_id' => $ticket->id,
             'user_id' => null,
             'sender_type' => TicketReply::SENDER_CUSTOMER,
             'message' => $message,
         ]);
+
+        TicketReplyBroadcast::dispatch($reply, $ticket->public_token, $ticket->name);
+
+        return $reply;
     }
 
     /**
