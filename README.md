@@ -1,58 +1,219 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Ticket Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 13 + Vue 3 ticket platform with AI categorization, realtime replies, and email notifications.
 
-## About Laravel
+## Prerequisites
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **PHP 8.3+**
+- **Composer 2.x**
+- **Node.js 22+** and **npm 10+**
+- **MySQL 8**
+- A **Google AI Studio** API key (free) — [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+- A **Twilio SendGrid** API key with a verified single sender
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Setup
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### 1. Clone and install
 
 ```bash
-composer require laravel/boost --dev
+git clone <repo-url> ticket-system
+cd ticket-system
 
-php artisan boost:install
+composer install
+npm install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### 2. Create the environment file
 
-## Contributing
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 3. Create the database
 
-## Code of Conduct
+```sql
+CREATE DATABASE ticket_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 4. Fill the required keys in `.env`
 
-## Security Vulnerabilities
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=ticket_system
+DB_USERNAME=root
+DB_PASSWORD=
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+GEMINI_API_KEY=YOUR_GEMINI_KEY
+GEMINI_MODEL=gemini-2.5-flash
 
-## License
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.sendgrid.net
+MAIL_PORT=587
+MAIL_USERNAME=apikey
+MAIL_PASSWORD=YOUR_SENDGRID_KEY
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=hello@your-verified-sender.com
+MAIL_FROM_NAME="Ticket System"
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+BROADCAST_CONNECTION=reverb
+REVERB_APP_ID=your-app-id
+REVERB_APP_KEY=your-app-key
+REVERB_APP_SECRET=your-app-secret
+REVERB_HOST=localhost
+REVERB_PORT=8081
+REVERB_SCHEME=http
+
+VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
+VITE_REVERB_HOST="${REVERB_HOST}"
+VITE_REVERB_PORT="${REVERB_PORT}"
+VITE_REVERB_SCHEME="${REVERB_SCHEME}"
+
+QUEUE_CONNECTION=database
+```
+
+> **Notes:**
+>
+> - `MAIL_USERNAME` is the literal string `apikey` (SendGrid convention).
+> - `MAIL_FROM_ADDRESS` must be a verified Single Sender in SendGrid.
+> - If `REVERB_PORT=8081` is already in use on Windows, change it and rebuild (`npm run build`).
+
+### 5. Migrate and seed
+
+```bash
+php artisan migrate --seed
+```
+
+This creates the admin user and 10 demo tickets.
+
+### 6. Build frontend assets
+
+```bash
+npm run build
+```
+
+---
+
+## Run the Application
+
+Open **four terminals** and run one command in each:
+
+```bash
+# Terminal 1 — Laravel HTTP server
+php artisan serve
+
+# Terminal 2 — Vite dev server (hot reload)
+npm run dev
+
+# Terminal 3 — WebSocket server (realtime + typing)
+php artisan reverb:start --port=8081
+
+# Terminal 4 — Queue worker (email delivery)
+php artisan queue:work
+```
+
+All four are needed for the full experience:
+
+- Skip terminal 3 → realtime and typing indicators stop working.
+- Skip terminal 4 → emails queue up but are never delivered.
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser.
+
+---
+
+## How to Use
+
+### Demo credentials
+
+```text
+Admin URL:  http://127.0.0.1:8000/login
+Email:      tarikulislamnahid15@gmail.com
+Password:   password
+```
+
+### Customer side
+
+#### Submit a ticket via form
+
+1. Visit [http://127.0.0.1:8000/contact](http://127.0.0.1:8000/contact).
+2. Fill in name, email (or phone), subject, message.
+3. Click **Submit ticket**.
+4. You are redirected to `/ticket/{token}` — your private tracking page.
+5. A confirmation email is sent to the address you provided (requires `queue:work`).
+
+#### Submit a ticket via chat
+
+1. On any public page, click the floating chat button in the bottom-right corner.
+2. Fill in the form (name, email/phone, first message) and hit **Start chat**.
+3. The widget switches to a conversation view; the session is saved in `localStorage`.
+4. Close the tab and reopen `/contact` later — the widget restores your chat automatically.
+
+#### Track and reply to a ticket
+
+1. Open the `/ticket/{token}` link (from the confirmation email or the chat widget).
+2. New admin replies appear in real time.
+3. Type a reply in the form at the bottom and click **Send reply** — the admin sees it instantly.
+4. When the admin closes the ticket, the reply form is replaced by a "ticket closed" message.
+
+### Admin side
+
+#### Log in
+
+Go to `/login` and sign in with the demo credentials above.
+
+#### View all tickets
+
+1. Click **Tickets** in the sidebar.
+2. Use the search box (ticket number, name, email, subject) or the status dropdown to filter.
+3. Click any row to open the ticket.
+
+#### Reply to a ticket
+
+1. On the ticket detail page, read the conversation thread.
+2. If Gemini is configured, an AI-suggested reply appears in the right sidebar and above the reply box.
+3. Click **Use AI suggestion** to paste the draft into the textarea — edit as needed.
+4. Click **Send reply**. The customer receives an email and sees the reply live if the ticket page is open.
+5. Start typing — the customer's window shows "Support is typing…" while you compose.
+
+#### Change ticket status
+
+- On the ticket detail page, use the **Close ticket** / **Reopen ticket** button in the Details card on the right.
+- The customer's window reflects the new status instantly; the reply form hides when closed.
+
+---
+
+## Tip: Quick Realtime Demo
+
+Open two windows side by side:
+
+1. **Window A:** admin ticket detail at `/admin/tickets/{id}`
+2. **Window B:** public view at `/ticket/{public_token}` for the same ticket
+
+Type in Window A — Window B shows a typing indicator. Send a reply — it appears in Window B instantly. Close the ticket — Window B's reply form disappears.
+
+---
+
+## Troubleshooting
+
+**Emails are not arriving.**
+
+- Confirm `php artisan queue:work`  
+- Verify `MAIL_FROM_ADDRESS` is added under **Settings → Sender Authentication** in SendGrid.
+
+**Typing indicator and live replies are not working.**
+
+- Confirm `php artisan reverb:start --port=8081` is running (Terminal 3).
+- Check the browser console for WebSocket errors.
+- Verify `VITE_REVERB_*` values match `REVERB_*` and re-run `npm run build` after changes.
+
+**Reverb won't start — "Failed to listen on tcp://0.0.0.0:8081".**
+
+- Another process is on that port. Run `netstat -ano | findstr ":8081"` (Windows) or `lsof -i :8081` (macOS/Linux), pick an unused port, update `REVERB_PORT` and re-run `npm run build`.
+
+**AI is always returning "other".**
+
+- `GEMINI_API_KEY` is missing or invalid — the app silently falls back to a keyword classifier. Set a valid key in `.env` and run `php artisan config:clear`.
