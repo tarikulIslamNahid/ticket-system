@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin\TicketController as AdminTicketController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Public\ContactController;
 use App\Http\Controllers\Public\TicketViewController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/', function () {
     return redirect()->route('contact.create');
@@ -37,9 +37,7 @@ Route::prefix('chat')->name('chat.')->group(function (): void {
 });
 
 Route::middleware('auth')->group(function (): void {
-    Route::get('/dashboard', function () {
-        return Inertia::render('Dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/tickets', [AdminTicketController::class, 'index'])->name('tickets.index');

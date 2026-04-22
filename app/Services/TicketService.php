@@ -12,6 +12,7 @@ use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -120,6 +121,61 @@ class TicketService
             ->latest()
             ->paginate($perPage)
             ->withQueryString();
+    }
+
+    /**
+     * Aggregated counts for the admin dashboard.
+     *
+     * @return array{
+     *     total: int,
+     *     open: int,
+     *     closed: int,
+     *     last_24h: int,
+     *     by_source: array<string, int>,
+     *     by_category: array<string, int>
+     * }
+     */
+    public function getDashboardStats(): array
+    {
+        $total = Ticket::count();
+        $open = Ticket::where('status', Ticket::STATUS_OPEN)->count();
+        $closed = Ticket::where('status', Ticket::STATUS_CLOSED)->count();
+        $last24h = Ticket::where('created_at', '>=', Carbon::now()->subHours(24))->count();
+
+        $bySource = Ticket::query()
+            ->selectRaw('source, COUNT(*) as count')
+            ->groupBy('source')
+            ->pluck('count', 'source')
+            ->map(fn ($c): int => (int) $c)
+            ->toArray();
+
+        $byCategory = Ticket::query()
+            ->selectRaw('category, COUNT(*) as count')
+            ->groupBy('category')
+            ->pluck('count', 'category')
+            ->map(fn ($c): int => (int) $c)
+            ->toArray();
+
+        return [
+            'total' => $total,
+            'open' => $open,
+            'closed' => $closed,
+            'last_24h' => $last24h,
+            'by_source' => $bySource,
+            'by_category' => $byCategory,
+        ];
+    }
+
+    /**
+     * @return Collection<int, Ticket>
+     */
+    public function getRecentTickets(int $limit = 5): Collection
+    {
+        return Ticket::query()
+            ->withCount('replies')
+            ->latest()
+            ->limit($limit)
+            ->get();
     }
 
     public function changeStatus(Ticket $ticket, string $status): Ticket
