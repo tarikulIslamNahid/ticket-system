@@ -4,7 +4,6 @@ import { computed } from 'vue';
 import {
     LayoutDashboard,
     Ticket,
-    Settings,
     LogOut,
     ChevronsUpDown,
 } from 'lucide-vue-next';
@@ -49,13 +48,6 @@ const navItems = [
         icon: Ticket,
         route: 'admin.tickets.index',
         href: '/admin/tickets',
-    },
-    {
-        label: 'Settings',
-        icon: Settings,
-        route: 'settings',
-        href: '#',
-        disabled: true,
     },
 ];
 

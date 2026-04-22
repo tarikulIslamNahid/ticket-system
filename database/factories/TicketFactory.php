@@ -99,7 +99,7 @@ class TicketFactory extends Factory
             'message' => $message,
             'category' => $category,
             'status' => Ticket::STATUS_OPEN,
-            'ai_suggested_reply' => $this->faker->optional(0.6)->randomElement([
+            'ai_suggested_reply' => $this->faker->randomElement([
                 'Thank you for reaching out. Our team is looking into this and will follow up shortly.',
                 'Thanks for the details. We are investigating the issue and will update you as soon as we have more information.',
                 'Appreciate you letting us know. We will review your account and get back to you.',
