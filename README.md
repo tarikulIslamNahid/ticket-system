@@ -18,7 +18,7 @@ Laravel 13 + Vue 3 ticket platform with AI categorization, realtime replies, and
 ### 1. Clone and install
 
 ```bash
-git clone <repo-url> ticket-system
+git clone https://github.com/tarikulIslamNahid/ticket-system.git ticket-system
 cd ticket-system
 
 composer install
